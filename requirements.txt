@@ -8,3 +8,5 @@ sentence-transformers
 chromadb
 langchain-text-splitters
 torchvision
+protobuf==3.20.3
+langchain-huggingface

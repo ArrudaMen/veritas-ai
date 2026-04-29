@@ -4,7 +4,7 @@ from groq import Groq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="Veritas AI", page_icon="📜", layout="centered")
