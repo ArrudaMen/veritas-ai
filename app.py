@@ -9,13 +9,12 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # --- 1. CONFIGURAÇÃO VISUAL E LIMPEZA ---
 st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered")
 
+# CONSERTO DO BUG DO MENU LATERIAL: Tirei o "header hidden"
 st.markdown("""
     <style>
-    /* Esconde o cabeçalho, foto do GitHub e menus padrão */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stAppHeader {display: none;}
+    .stDeployButton {display:none;} /* Esconde só o botão de deploy lá em cima */
     .main { background-color: #fcfcfc; }
     
     .welcome-container {
@@ -25,44 +24,78 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SISTEMA DE LOGIN OPCIONAL (MENU LATERAL) ---
+# --- 2. BANCO DE DADOS TEMPORÁRIO E SESSÃO ---
+# Simulando um banco de dados para testar a criação de contas
+if "banco_usuarios" not in st.session_state:
+    st.session_state.banco_usuarios = {
+        "admin": {"senha": "123", "nome": "Administrador", "nascimento": "01/01/1990"}
+    }
+
 if "logado" not in st.session_state:
     st.session_state.logado = False
-    st.session_state.usuario = "Visitante"
+    st.session_state.usuario = ""
+    st.session_state.nome_completo = ""
 
+# --- 3. MENU LATERAL (LOGIN E CADASTRO) ---
 with st.sidebar:
-    st.markdown("### 💾 Seu Histórico")
+    st.markdown("### 👤 Área do Usuário")
     
     if not st.session_state.logado:
-        st.info("Faça login para salvar suas conversas (Em breve!).")
-        usuario_input = st.text_input("Usuário", placeholder="Ex: maria")
-        senha_input = st.text_input("Senha", type="password")
+        # Alterna entre Login e Criar Conta
+        aba = st.radio("Escolha uma opção:", ["Entrar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
-        if st.button("Entrar", use_container_width=True):
-            if usuario_input == "maria" and senha_input == "123":
-                st.session_state.logado = True
-                st.session_state.usuario = usuario_input
-                st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos.")
+        if aba == "Entrar":
+            usuario_login = st.text_input("Usuário", placeholder="Ex: maria")
+            senha_login = st.text_input("Senha", type="password")
+            
+            if st.button("Entrar", use_container_width=True):
+                # Verifica se o usuário existe no "banco" e se a senha bate
+                if usuario_login in st.session_state.banco_usuarios and st.session_state.banco_usuarios[usuario_login]["senha"] == senha_login:
+                    st.session_state.logado = True
+                    st.session_state.usuario = usuario_login
+                    st.session_state.nome_completo = st.session_state.banco_usuarios[usuario_login]["nome"]
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha inválidos.")
+                    
+        elif aba == "Criar Conta":
+            nome_cadastro = st.text_input("Nome Completo")
+            usuario_cadastro = st.text_input("Nome de Usuário (Login)")
+            nascimento_cadastro = st.date_input("Data de Nascimento", format="DD/MM/YYYY")
+            senha_cadastro = st.text_input("Senha", type="password")
+            
+            if st.button("Cadastrar", use_container_width=True):
+                if not nome_cadastro or not usuario_cadastro or not senha_cadastro:
+                    st.warning("Preencha todos os campos obrigatórios!")
+                elif usuario_cadastro in st.session_state.banco_usuarios:
+                    st.error("❌ Esse nome de usuário já está em uso! Escolha outro.")
+                else:
+                    # Salva no banco de dados temporário
+                    st.session_state.banco_usuarios[usuario_cadastro] = {
+                        "senha": senha_cadastro,
+                        "nome": nome_cadastro,
+                        "nascimento": nascimento_cadastro
+                    }
+                    st.success("✅ Conta criada com sucesso! Mude para a opção 'Entrar'.")
     else:
-        st.success(f"Logado como: {st.session_state.usuario.capitalize()}")
+        st.success(f"Logado como: {st.session_state.nome_completo}")
         if st.button("Sair 🚪", use_container_width=True):
             st.session_state.logado = False
-            st.session_state.usuario = "Visitante"
+            st.session_state.usuario = ""
+            st.session_state.nome_completo = ""
             st.session_state.mensagens = []
             st.rerun()
 
-# --- 3. SEGREDOS E CLIENTE (GROQ) ---
+# --- 4. SEGREDOS E CLIENTE (GROQ) ---
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
 except:
-    st.error("Chave GROQ_API_KEY não encontrada. Configure os Secrets.")
+    st.error("Chave GROQ_API_KEY não encontrada.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
 
-# --- 4. FUNÇÃO PARA LER OS PDFs (RAG) OTIMIZADA ---
+# --- 5. FUNÇÃO PARA LER OS PDFs (RAG) ---
 @st.cache_resource 
 def inicializar_conhecimento():
     diretorio_banco = "docs/chroma"
@@ -73,7 +106,6 @@ def inicializar_conhecimento():
     
     pasta_docs = "docs"
     documentos_finais = []
-    
     if os.path.exists(pasta_docs):
         for arquivo in os.listdir(pasta_docs):
             if arquivo.endswith(".pdf"):
@@ -86,83 +118,73 @@ def inicializar_conhecimento():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     textos = text_splitter.split_documents(documentos_finais)
     
-    vectorstore = Chroma.from_documents(
-        documents=textos, 
-        embedding=embeddings,
-        persist_directory=diretorio_banco
-    )
+    vectorstore = Chroma.from_documents(documents=textos, embedding=embeddings, persist_directory=diretorio_banco)
     return vectorstore
 
 base_conhecimento = inicializar_conhecimento()
 
-# --- 5. INTERFACE DINÂMICA (ESTILO GEMINI) ---
+# --- 6. INTERFACE DINÂMICA (ESTILO GEMINI) ---
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = []
     
-# Variável temporária para guardar a pergunta feita na barra do meio
 if "primeira_pergunta" not in st.session_state:
     st.session_state.primeira_pergunta = None
 
-# Se o chat estiver vazio E não houver uma pergunta aguardando processamento
+# TELA INICIAL LIMPA (SE NÃO TIVER CONVERSA)
 if len(st.session_state.mensagens) == 0 and st.session_state.primeira_pergunta is None:
     
-    # 5.1 TELA DE BOAS VINDAS (EXATAMENTE COMO VOCÊ PEDIU)
     st.markdown("""
         <div class="welcome-container">
             <h1 style='font-size: 3rem; color: #8B7500; font-family: serif;'>Veritas AI</h1>
-            <p style='font-size: 1.2rem; color: #555;'><b>Veritas</b> vem do latim e significa <b>Verdade</b>.</p>
+            <p style='font-size: 1.2rem; color: #555; margin-bottom: 30px;'>
+                <b>Veritas</b> vem do latim e significa <b>Verdade</b>.
+            </p>
             <p style='margin-bottom: 20px;'>
                 Esta I.A. consulta o Catecismo, o Direito Canônico e as Escrituras 
                 para trazer respostas fiéis à tradição católica.
             </p>
-            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 10px; border-left: 5px solid #8B7500; font-style: italic; margin-bottom: 30px;'>
+            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 10px; border-left: 5px solid #8B7500; font-style: italic; margin-bottom: 30px; display: inline-block;'>
                 "Conhecereis a verdade, e a verdade vos libertará." (João 8:32)
             </div>
         </div>
         """, unsafe_allow_html=True)
     
-    # 5.2 A BARRA DE PESQUISA NO MEIO DA TELA
     col1, col2, col3 = st.columns([1, 6, 1])
     with col2:
         pergunta_centro = st.text_input("Pesquisa", placeholder="Em que posso ajudar na sua fé hoje?", label_visibility="collapsed")
         if pergunta_centro:
-            # Salva a pergunta e recarrega a página na hora pra mudar o visual
             st.session_state.primeira_pergunta = pergunta_centro
             st.rerun()
 
 else:
-    # 5.3 VISUAL DE CHAT (Quando já tem conversa rolando)
+    # VISUAL DE CHAT
     st.markdown("<h3 style='text-align: center; color: #8B7500; font-family: serif;'>Veritas AI</h3>", unsafe_allow_html=True)
     
     for msg in st.session_state.mensagens:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
     
-    # A barra de pesquisa oficial do rodapé
     pergunta_baixo = st.chat_input("Continue sua pesquisa...")
     
-    # Define qual pergunta vai para a I.A. (a do meio ou a do rodapé)
     pergunta_submetida = None
     if st.session_state.primeira_pergunta:
         pergunta_submetida = st.session_state.primeira_pergunta
-        st.session_state.primeira_pergunta = None # Limpa a memória
+        st.session_state.primeira_pergunta = None
     elif pergunta_baixo:
         pergunta_submetida = pergunta_baixo
         
-    # --- 6. LÓGICA DE PROCESSAMENTO DA I.A. ---
+    # PROCESSAMENTO
     if pergunta_submetida:
         st.session_state.mensagens.append({"role": "user", "content": pergunta_submetida})
         
         with st.chat_message("user"):
             st.markdown(pergunta_submetida)
 
-        # BUSCA NO PDF
         contexto_pdf = ""
         if base_conhecimento:
             busca = base_conhecimento.similarity_search(pergunta_submetida, k=3)
             contexto_pdf = "\n".join([doc.page_content for doc in busca])
 
-        # PROMPT PARA A IA
         instrucao_sistema = f"""
         Você é o Veritas AI, um assistente teológico católico.
         Responda em no máximo 2 parágrafos. Seja direto e fiel aos dogmas.
