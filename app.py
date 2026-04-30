@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import datetime
 from groq import Groq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -9,12 +10,11 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # --- 1. CONFIGURAÇÃO VISUAL E LIMPEZA ---
 st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered")
 
-# CONSERTO DO BUG DO MENU LATERIAL: Tirei o "header hidden"
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    .stDeployButton {display:none;} /* Esconde só o botão de deploy lá em cima */
+    .stDeployButton {display:none;}
     .main { background-color: #fcfcfc; }
     
     .welcome-container {
@@ -25,7 +25,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. BANCO DE DADOS TEMPORÁRIO E SESSÃO ---
-# Simulando um banco de dados para testar a criação de contas
 if "banco_usuarios" not in st.session_state:
     st.session_state.banco_usuarios = {
         "admin": {"senha": "123", "nome": "Administrador", "nascimento": "01/01/1990"}
@@ -41,7 +40,6 @@ with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
     if not st.session_state.logado:
-        # Alterna entre Login e Criar Conta
         aba = st.radio("Escolha uma opção:", ["Entrar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
         if aba == "Entrar":
@@ -49,7 +47,6 @@ with st.sidebar:
             senha_login = st.text_input("Senha", type="password")
             
             if st.button("Entrar", use_container_width=True):
-                # Verifica se o usuário existe no "banco" e se a senha bate
                 if usuario_login in st.session_state.banco_usuarios and st.session_state.banco_usuarios[usuario_login]["senha"] == senha_login:
                     st.session_state.logado = True
                     st.session_state.usuario = usuario_login
@@ -61,22 +58,30 @@ with st.sidebar:
         elif aba == "Criar Conta":
             nome_cadastro = st.text_input("Nome Completo")
             usuario_cadastro = st.text_input("Nome de Usuário (Login)")
-            nascimento_cadastro = st.date_input("Data de Nascimento", format="DD/MM/YYYY")
+            
+            # --- CORREÇÃO DA DATA DE NASCIMENTO ---
+            nascimento_cadastro = st.date_input(
+                "Data de Nascimento", 
+                format="DD/MM/YYYY",
+                min_value=datetime.date(1900, 1, 1), # Vai até o ano 1900
+                max_value=datetime.date.today(),     # Não deixa colocar data do futuro
+                value=None                           # Deixa o campo em branco por padrão
+            )
+            
             senha_cadastro = st.text_input("Senha", type="password")
             
             if st.button("Cadastrar", use_container_width=True):
-                if not nome_cadastro or not usuario_cadastro or not senha_cadastro:
+                if not nome_cadastro or not usuario_cadastro or not senha_cadastro or not nascimento_cadastro:
                     st.warning("Preencha todos os campos obrigatórios!")
                 elif usuario_cadastro in st.session_state.banco_usuarios:
                     st.error("❌ Esse nome de usuário já está em uso! Escolha outro.")
                 else:
-                    # Salva no banco de dados temporário
                     st.session_state.banco_usuarios[usuario_cadastro] = {
                         "senha": senha_cadastro,
                         "nome": nome_cadastro,
                         "nascimento": nascimento_cadastro
                     }
-                    st.success("✅ Conta criada com sucesso! Mude para a opção 'Entrar'.")
+                    st.success("✅ Conta criada com sucesso! Mude para a aba 'Entrar'.")
     else:
         st.success(f"Logado como: {st.session_state.nome_completo}")
         if st.button("Sair 🚪", use_container_width=True):
@@ -130,7 +135,6 @@ if "mensagens" not in st.session_state:
 if "primeira_pergunta" not in st.session_state:
     st.session_state.primeira_pergunta = None
 
-# TELA INICIAL LIMPA (SE NÃO TIVER CONVERSA)
 if len(st.session_state.mensagens) == 0 and st.session_state.primeira_pergunta is None:
     
     st.markdown("""
@@ -157,7 +161,6 @@ if len(st.session_state.mensagens) == 0 and st.session_state.primeira_pergunta i
             st.rerun()
 
 else:
-    # VISUAL DE CHAT
     st.markdown("<h3 style='text-align: center; color: #8B7500; font-family: serif;'>Veritas AI</h3>", unsafe_allow_html=True)
     
     for msg in st.session_state.mensagens:
@@ -173,7 +176,6 @@ else:
     elif pergunta_baixo:
         pergunta_submetida = pergunta_baixo
         
-    # PROCESSAMENTO
     if pergunta_submetida:
         st.session_state.mensagens.append({"role": "user", "content": pergunta_submetida})
         
