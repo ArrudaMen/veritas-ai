@@ -43,8 +43,8 @@ with st.sidebar:
         aba = st.radio("Escolha uma opção:", ["Entrar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
         if aba == "Entrar":
-            usuario_login = st.text_input("Usuário", placeholder="Ex: maria")
-            senha_login = st.text_input("Senha", type="password")
+            usuario_login = st.text_input("Usuário", placeholder="Ex: maria", key="login_user")
+            senha_login = st.text_input("Senha", type="password", key="login_pass")
             
             if st.button("Entrar", use_container_width=True):
                 if usuario_login in st.session_state.banco_usuarios and st.session_state.banco_usuarios[usuario_login]["senha"] == senha_login:
@@ -56,19 +56,19 @@ with st.sidebar:
                     st.error("Usuário ou senha inválidos.")
                     
         elif aba == "Criar Conta":
-            nome_cadastro = st.text_input("Nome Completo")
-            usuario_cadastro = st.text_input("Nome de Usuário (Login)")
+            nome_cadastro = st.text_input("Nome Completo", key="cad_nome")
+            usuario_cadastro = st.text_input("Nome de Usuário (Login)", key="cad_user")
             
-            # --- CORREÇÃO DA DATA DE NASCIMENTO ---
             nascimento_cadastro = st.date_input(
                 "Data de Nascimento", 
                 format="DD/MM/YYYY",
-                min_value=datetime.date(1900, 1, 1), # Vai até o ano 1900
-                max_value=datetime.date.today(),     # Não deixa colocar data do futuro
-                value=None                           # Deixa o campo em branco por padrão
+                min_value=datetime.date(1900, 1, 1),
+                max_value=datetime.date.today(),
+                value=None,
+                key="cad_nasc"
             )
             
-            senha_cadastro = st.text_input("Senha", type="password")
+            senha_cadastro = st.text_input("Senha", type="password", key="cad_pass")
             
             if st.button("Cadastrar", use_container_width=True):
                 if not nome_cadastro or not usuario_cadastro or not senha_cadastro or not nascimento_cadastro:
@@ -105,10 +105,8 @@ client = Groq(api_key=GROQ_KEY)
 def inicializar_conhecimento():
     diretorio_banco = "docs/chroma"
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    
     if os.path.exists(diretorio_banco):
         return Chroma(persist_directory=diretorio_banco, embedding_function=embeddings)
-    
     pasta_docs = "docs"
     documentos_finais = []
     if os.path.exists(pasta_docs):
@@ -116,27 +114,20 @@ def inicializar_conhecimento():
             if arquivo.endswith(".pdf"):
                 loader = PyPDFLoader(os.path.join(pasta_docs, arquivo))
                 documentos_finais.extend(loader.load())
-    
-    if not documentos_finais:
-        return None
-
+    if not documentos_finais: return None
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     textos = text_splitter.split_documents(documentos_finais)
-    
     vectorstore = Chroma.from_documents(documents=textos, embedding=embeddings, persist_directory=diretorio_banco)
     return vectorstore
 
 base_conhecimento = inicializar_conhecimento()
 
-# --- 6. INTERFACE DINÂMICA (ESTILO GEMINI) ---
+# --- 6. INTERFACE OFICIAL DO CHAT ---
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = []
-    
-if "primeira_pergunta" not in st.session_state:
-    st.session_state.primeira_pergunta = None
 
-if len(st.session_state.mensagens) == 0 and st.session_state.primeira_pergunta is None:
-    
+# TELA INICIAL LIMPA (SE NÃO TIVER CONVERSA)
+if len(st.session_state.mensagens) == 0:
     st.markdown("""
         <div class="welcome-container">
             <h1 style='font-size: 3rem; color: #8B7500; font-family: serif;'>Veritas AI</h1>
@@ -152,60 +143,47 @@ if len(st.session_state.mensagens) == 0 and st.session_state.primeira_pergunta i
             </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col2:
-        pergunta_centro = st.text_input("Pesquisa", placeholder="Em que posso ajudar na sua fé hoje?", label_visibility="collapsed")
-        if pergunta_centro:
-            st.session_state.primeira_pergunta = pergunta_centro
-            st.rerun()
-
 else:
+    # Título menor pro topo quando a conversa começar
     st.markdown("<h3 style='text-align: center; color: #8B7500; font-family: serif;'>Veritas AI</h3>", unsafe_allow_html=True)
-    
-    for msg in st.session_state.mensagens:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-    
-    pergunta_baixo = st.chat_input("Continue sua pesquisa...")
-    
-    pergunta_submetida = None
-    if st.session_state.primeira_pergunta:
-        pergunta_submetida = st.session_state.primeira_pergunta
-        st.session_state.primeira_pergunta = None
-    elif pergunta_baixo:
-        pergunta_submetida = pergunta_baixo
-        
-    if pergunta_submetida:
-        st.session_state.mensagens.append({"role": "user", "content": pergunta_submetida})
-        
-        with st.chat_message("user"):
-            st.markdown(pergunta_submetida)
 
-        contexto_pdf = ""
-        if base_conhecimento:
-            busca = base_conhecimento.similarity_search(pergunta_submetida, k=3)
-            contexto_pdf = "\n".join([doc.page_content for doc in busca])
+# Imprime o histórico do chat
+for msg in st.session_state.mensagens:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-        instrucao_sistema = f"""
-        Você é o Veritas AI, um assistente teológico católico.
-        Responda em no máximo 2 parágrafos. Seja direto e fiel aos dogmas.
-        Use o seguinte contexto extraído de documentos oficiais para sua resposta:
-        {contexto_pdf}
-        """
+# CAMPO DE PESQUISA (Nativo, com a setinha, sempre no rodapé)
+if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
+    
+    st.session_state.mensagens.append({"role": "user", "content": pergunta})
+    with st.chat_message("user"):
+        st.markdown(pergunta)
 
-        try:
-            with st.chat_message("assistant"):
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": instrucao_sistema},
-                        *[{"role": m["role"], "content": m["content"]} for m in st.session_state.mensagens]
-                    ],
-                    model="llama-3.3-70b-versatile",
-                    temperature=0.3
-                )
-                resposta = chat_completion.choices[0].message.content
-                st.markdown(resposta)
-                st.session_state.mensagens.append({"role": "assistant", "content": resposta})
-        except Exception as e:
-            st.error("Erro inesperado: {}".format(e))
+    # BUSCA NO PDF
+    contexto_pdf = ""
+    if base_conhecimento:
+        busca = base_conhecimento.similarity_search(pergunta, k=3)
+        contexto_pdf = "\n".join([doc.page_content for doc in busca])
+
+    instrucao_sistema = f"""
+    Você é o Veritas AI, um assistente teológico católico.
+    Responda em no máximo 2 parágrafos. Seja direto e fiel aos dogmas.
+    Use o seguinte contexto extraído de documentos oficiais para sua resposta:
+    {contexto_pdf}
+    """
+
+    try:
+        with st.chat_message("assistant"):
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": instrucao_sistema},
+                    *[{"role": m["role"], "content": m["content"]} for m in st.session_state.mensagens]
+                ],
+                model="llama-3.3-70b-versatile",
+                temperature=0.3
+            )
+            resposta = chat_completion.choices[0].message.content
+            st.markdown(resposta)
+            st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+    except Exception as e:
+        st.error("Erro inesperado: {}".format(e))
