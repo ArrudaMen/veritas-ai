@@ -21,7 +21,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. CONFIGURAÇÃO DE SEGREDOS (GROQ E SUPABASE) ---
+# --- 2. CONFIGURAÇÃO DE SEGREDOS ---
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -30,7 +30,6 @@ except Exception as e:
     st.error("⚠️ Faltam chaves nos Secrets! Verifique o GROQ e o SUPABASE.")
     st.stop()
 
-# Conectando com a I.A. e com o Banco de Dados Real
 client_groq = Groq(api_key=GROQ_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -40,8 +39,15 @@ if "logado" not in st.session_state:
     st.session_state.usuario = ""
     st.session_state.nome_completo = ""
     st.session_state.mensagens = []
+    st.session_state.conversa_atual = None # NOVO: Sabe em qual chat estamos!
 
-# --- 4. MENU LATERAL (LOGIN E CADASTRO REAL) ---
+# Função para trocar de conversa
+def carregar_chat(conversa_id):
+    st.session_state.conversa_atual = conversa_id
+    historico = supabase.table("mensagens").select("role, content").eq("conversa_id", conversa_id).order("id").execute()
+    st.session_state.mensagens = historico.data
+
+# --- 4. MENU LATERAL (COM HISTÓRICO DE CHATS) ---
 with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
@@ -49,62 +55,69 @@ with st.sidebar:
         aba = st.radio("Escolha:", ["Entrar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
         if aba == "Entrar":
-            usuario_login = st.text_input("Usuário", placeholder="Ex: maria", key="login_user")
+            usuario_login = st.text_input("Usuário", key="login_user")
             senha_login = st.text_input("Senha", type="password", key="login_pass")
-            
             if st.button("Entrar", use_container_width=True):
                 try:
-                    # 🔎 Vai no banco de dados procurar o usuário
                     resposta = supabase.table("usuarios").select("*").eq("usuario", usuario_login).eq("senha", senha_login).execute()
-                    
                     if len(resposta.data) > 0:
                         st.session_state.logado = True
                         st.session_state.usuario = usuario_login
                         st.session_state.nome_completo = resposta.data[0]["nome_completo"]
-                        
-                        # 📚 Puxa o histórico de mensagens desse usuário!
-                        historico = supabase.table("mensagens").select("role, content").eq("usuario", usuario_login).order("id").execute()
-                        st.session_state.mensagens = historico.data
-                        
+                        st.session_state.conversa_atual = None
+                        st.session_state.mensagens = []
                         st.rerun()
                     else:
                         st.error("Usuário ou senha inválidos.")
                 except Exception as e:
                     st.error(f"Erro ao conectar com o banco: {e}")
-                    
         elif aba == "Criar Conta":
             nome_cadastro = st.text_input("Nome Completo", key="cad_nome")
             usuario_cadastro = st.text_input("Nome de Usuário (Login)", key="cad_user")
             nascimento_cadastro = st.date_input("Data de Nasc.", format="DD/MM/YYYY", min_value=datetime.date(1900, 1, 1), max_value=datetime.date.today(), value=None, key="cad_nasc")
             senha_cadastro = st.text_input("Senha", type="password", key="cad_pass")
-            
             if st.button("Cadastrar", use_container_width=True):
                 if not nome_cadastro or not usuario_cadastro or not senha_cadastro or not nascimento_cadastro:
                     st.warning("Preencha todos os campos obrigatórios!")
                 else:
                     try:
-                        # 💾 Tenta salvar no Supabase
-                        supabase.table("usuarios").insert({
-                            "usuario": usuario_cadastro,
-                            "nome_completo": nome_cadastro,
-                            "nascimento": str(nascimento_cadastro),
-                            "senha": senha_cadastro
-                        }).execute()
+                        supabase.table("usuarios").insert({"usuario": usuario_cadastro, "nome_completo": nome_cadastro, "nascimento": str(nascimento_cadastro), "senha": senha_cadastro}).execute()
                         st.success("✅ Conta criada! Mude para a aba 'Entrar'.")
                     except Exception as e:
-                        # Agora ele verifica o erro real
-                        erro_str = str(e)
-                        if "duplicate key" in erro_str or "23505" in erro_str:
+                        if "duplicate key" in str(e) or "23505" in str(e):
                             st.error("❌ Esse nome de usuário já está em uso!")
                         else:
-                            st.error(f"❌ Erro no banco de dados: {erro_str}")
+                            st.error(f"❌ Erro no banco de dados.")
     else:
         st.success(f"Logado como: {st.session_state.nome_completo}")
+        
+        # --- A MÁGICA: BOTOES DO HISTÓRICO DE CONVERSAS ---
+        st.markdown("---")
+        if st.button("➕ Nova conversa", use_container_width=True):
+            st.session_state.conversa_atual = None
+            st.session_state.mensagens = []
+            st.rerun()
+        
+        st.markdown("**Seus chats recentes:**")
+        try:
+            # Busca no banco todas as conversas que esse usuário criou
+            conversas_db = supabase.table("conversas").select("*").eq("usuario", st.session_state.usuario).order("created_at", desc=True).execute()
+            for conv in conversas_db.data:
+                icone = "📌" if st.session_state.conversa_atual == conv["id"] else "💬"
+                # Cria um botão para cada conversa salva!
+                if st.button(f"{icone} {conv['titulo']}...", key=f"chat_{conv['id']}", use_container_width=True):
+                    carregar_chat(conv["id"])
+                    st.rerun()
+        except Exception as e:
+            pass # Se não carregar o histórico, não quebra a tela
+
+        st.markdown("---")
         if st.button("Sair 🚪", use_container_width=True):
             st.session_state.logado = False
             st.session_state.usuario = ""
             st.session_state.nome_completo = ""
             st.session_state.mensagens = []
+            st.session_state.conversa_atual = None
             st.rerun()
 
 # --- 5. FUNÇÃO PARA LER OS PDFs (RAG) ---
@@ -137,11 +150,8 @@ if len(st.session_state.mensagens) == 0:
             <p style='font-size: 1.2rem; color: #555; margin-bottom: 30px;'>
                 <b>Veritas</b> vem do latim e significa <b>Verdade</b>.
             </p>
-            <p style='margin-bottom: 20px;'>
-                Esta I.A. consulta o Catecismo, o Direito Canônico e as Escrituras 
-                para trazer respostas fiéis à tradição católica.
-            </p>
-            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 10px; border-left: 5px solid #8B7500; font-style: italic; margin-bottom: 30px; display: inline-block;'>
+            <p style='margin-bottom: 20px;'>Esta I.A. consulta o Catecismo, o Direito Canônico e as Escrituras para trazer respostas fiéis.</p>
+            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 10px; border-left: 5px solid #8B7500; font-style: italic; display: inline-block;'>
                 "Conhecereis a verdade, e a verdade vos libertará." (João 8:32)
             </div>
         </div>
@@ -149,7 +159,7 @@ if len(st.session_state.mensagens) == 0:
 else:
     st.markdown("<h3 style='text-align: center; color: #8B7500; font-family: serif;'>Veritas AI</h3>", unsafe_allow_html=True)
 
-# Imprime o histórico do chat na tela
+# Imprime mensagens na tela
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -161,19 +171,34 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
     with st.chat_message("user"):
         st.markdown(pergunta)
         
-    # 💾 Se tiver logado, salva a pergunta no Supabase!
+    # 💾 Se tiver logado, cria uma Nova Conversa ou salva na atual
     if st.session_state.logado:
         try:
-            supabase.table("mensagens").insert({"usuario": st.session_state.usuario, "role": "user", "content": pergunta}).execute()
+            if st.session_state.conversa_atual is None:
+                # É a primeira mensagem! Cria um título com 25 letras.
+                titulo_chat = pergunta[:25]
+                nova_conversa = supabase.table("conversas").insert({
+                    "usuario": st.session_state.usuario,
+                    "titulo": titulo_chat
+                }).execute()
+                st.session_state.conversa_atual = nova_conversa.data[0]["id"]
+            
+            # Salva a mensagem no banco com a etiqueta de ID dessa conversa
+            supabase.table("mensagens").insert({
+                "conversa_id": st.session_state.conversa_atual,
+                "usuario": st.session_state.usuario, 
+                "role": "user", 
+                "content": pergunta
+            }).execute()
         except Exception as e:
-            pass # Ignora erro silenciosamente se falhar o salvamento
+            pass 
 
     contexto_pdf = ""
     if base_conhecimento:
         busca = base_conhecimento.similarity_search(pergunta, k=3)
         contexto_pdf = "\n".join([doc.page_content for doc in busca])
 
-    instrucao_sistema = f"""Você é o Veritas AI, um assistente teológico católico. Responda em no máximo 2 parágrafos. Seja direto e fiel aos dogmas. Use o seguinte contexto extraído de documentos oficiais para sua resposta: {contexto_pdf}"""
+    instrucao_sistema = f"""Você é o Veritas AI, um assistente teológico católico. Responda em no máximo 2 parágrafos. Use este contexto extraído de documentos: {contexto_pdf}"""
 
     try:
         with st.chat_message("assistant"):
@@ -184,15 +209,19 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
             )
             resposta = chat_completion.choices[0].message.content
             st.markdown(resposta)
-            
             st.session_state.mensagens.append({"role": "assistant", "content": resposta})
             
-            # 💾 Se tiver logado, salva a resposta da IA no Supabase!
-            if st.session_state.logado:
+            # 💾 Salva a resposta da I.A. no banco de dados na mesma conversa
+            if st.session_state.logado and st.session_state.conversa_atual:
                 try:
-                    supabase.table("mensagens").insert({"usuario": st.session_state.usuario, "role": "assistant", "content": resposta}).execute()
+                    supabase.table("mensagens").insert({
+                        "conversa_id": st.session_state.conversa_atual,
+                        "usuario": st.session_state.usuario, 
+                        "role": "assistant", 
+                        "content": resposta
+                    }).execute()
                 except:
                     pass
                 
     except Exception as e:
-        st.error("Erro inesperado: {}".format(e))
+        st.error("Erro inesperado.")
