@@ -26,7 +26,7 @@ try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except:
+except Exception as e:
     st.error("⚠️ Faltam chaves nos Secrets! Verifique o GROQ e o SUPABASE.")
     st.stop()
 
@@ -53,21 +53,24 @@ with st.sidebar:
             senha_login = st.text_input("Senha", type="password", key="login_pass")
             
             if st.button("Entrar", use_container_width=True):
-                # 🔎 Vai no banco de dados procurar o usuário
-                resposta = supabase.table("usuarios").select("*").eq("usuario", usuario_login).eq("senha", senha_login).execute()
-                
-                if len(resposta.data) > 0:
-                    st.session_state.logado = True
-                    st.session_state.usuario = usuario_login
-                    st.session_state.nome_completo = resposta.data[0]["nome_completo"]
+                try:
+                    # 🔎 Vai no banco de dados procurar o usuário
+                    resposta = supabase.table("usuarios").select("*").eq("usuario", usuario_login).eq("senha", senha_login).execute()
                     
-                    # 📚 Puxa o histórico de mensagens desse usuário!
-                    historico = supabase.table("mensagens").select("role, content").eq("usuario", usuario_login).order("id").execute()
-                    st.session_state.mensagens = historico.data
-                    
-                    st.rerun()
-                else:
-                    st.error("Usuário ou senha inválidos.")
+                    if len(resposta.data) > 0:
+                        st.session_state.logado = True
+                        st.session_state.usuario = usuario_login
+                        st.session_state.nome_completo = resposta.data[0]["nome_completo"]
+                        
+                        # 📚 Puxa o histórico de mensagens desse usuário!
+                        historico = supabase.table("mensagens").select("role, content").eq("usuario", usuario_login).order("id").execute()
+                        st.session_state.mensagens = historico.data
+                        
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha inválidos.")
+                except Exception as e:
+                    st.error(f"Erro ao conectar com o banco: {e}")
                     
         elif aba == "Criar Conta":
             nome_cadastro = st.text_input("Nome Completo", key="cad_nome")
@@ -79,8 +82,8 @@ with st.sidebar:
                 if not nome_cadastro or not usuario_cadastro or not senha_cadastro or not nascimento_cadastro:
                     st.warning("Preencha todos os campos obrigatórios!")
                 else:
-                    # 💾 Tenta salvar no Supabase
                     try:
+                        # 💾 Tenta salvar no Supabase
                         supabase.table("usuarios").insert({
                             "usuario": usuario_cadastro,
                             "nome_completo": nome_cadastro,
@@ -88,8 +91,13 @@ with st.sidebar:
                             "senha": senha_cadastro
                         }).execute()
                         st.success("✅ Conta criada! Mude para a aba 'Entrar'.")
-                    except:
-                        st.error("❌ Esse nome de usuário já está em uso!")
+                    except Exception as e:
+                        # Agora ele verifica o erro real
+                        erro_str = str(e)
+                        if "duplicate key" in erro_str or "23505" in erro_str:
+                            st.error("❌ Esse nome de usuário já está em uso!")
+                        else:
+                            st.error(f"❌ Erro no banco de dados: {erro_str}")
     else:
         st.success(f"Logado como: {st.session_state.nome_completo}")
         if st.button("Sair 🚪", use_container_width=True):
@@ -155,7 +163,10 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
         
     # 💾 Se tiver logado, salva a pergunta no Supabase!
     if st.session_state.logado:
-        supabase.table("mensagens").insert({"usuario": st.session_state.usuario, "role": "user", "content": pergunta}).execute()
+        try:
+            supabase.table("mensagens").insert({"usuario": st.session_state.usuario, "role": "user", "content": pergunta}).execute()
+        except Exception as e:
+            pass # Ignora erro silenciosamente se falhar o salvamento
 
     contexto_pdf = ""
     if base_conhecimento:
@@ -178,7 +189,10 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
             
             # 💾 Se tiver logado, salva a resposta da IA no Supabase!
             if st.session_state.logado:
-                supabase.table("mensagens").insert({"usuario": st.session_state.usuario, "role": "assistant", "content": resposta}).execute()
+                try:
+                    supabase.table("mensagens").insert({"usuario": st.session_state.usuario, "role": "assistant", "content": resposta}).execute()
+                except:
+                    pass
                 
     except Exception as e:
         st.error("Erro inesperado: {}".format(e))
