@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import datetime
-import hashlib # NOVO: Biblioteca de Criptografia do Python
+import hashlib
 from groq import Groq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -11,21 +11,51 @@ from supabase import create_client, Client
 
 # --- FUNÇÃO DE CRIPTOGRAFIA (HASH) ---
 def criptografar_senha(senha):
-    # Transforma a senha em uma "maçaroca" indecifrável de 64 caracteres
     return hashlib.sha256(senha.encode()).hexdigest()
 
 # --- 1. CONFIGURAÇÃO VISUAL E LIMPEZA ---
-st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered")
+# Mudamos para 'expanded' para tentar forçar o menu aberto no celular
+st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    [class^="viewerBadge"] { display: none !important; }
     .stDeployButton {display:none;}
     .main { background-color: #fcfcfc; }
     .welcome-container { text-align: center; padding: 40px 10px; }
+
+    /* ========================================================= */
+    /* 🥷 NOVO CÓDIGO NINJA DE CSS (CIRÚRGICO)                     */
+    /* ========================================================= */
+    
+    /* 1. Esconde o selo/badge do Streamlit (onde ficava a foto) */
+    [data-testid="stViewerBadge"] {
+        display: none !important;
+    }
+    
+    /* 2. Força o controle do menu lateral a APARECER no mobile */
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        background-color: white !important; /* Fundo branco pra destacar */
+        border-radius: 50% !important;     /* Redondinho */
+        border: 2px solid #8B7500 !important; /* Borda dourada */
+        width: 50px !important;            /* Maior pra dar o tap */
+        height: 50px !important;           /* Maior */
+        left: 10px !important;             /* Um pouco pro lado */
+        top: 10px !important;              /* Um pouco pra baixo */
+        z-index: 999999 !important;        /* Sempre no topo */
+    }
+
+    /* 3. Aumenta o tamanho da setinha '>' dentro do botão */
+    [data-testid="collapsedControl"] svg {
+        width: 30px !important;
+        height: 30px !important;
+        color: #8B7500 !important; /* Setinha dourada */
+    }
+    /* ========================================================= */
     </style>
     """, unsafe_allow_html=True)
 
@@ -54,7 +84,7 @@ def carregar_chat(conversa_id):
     historico = supabase.table("mensagens").select("role, content").eq("conversa_id", conversa_id).order("id").execute()
     st.session_state.mensagens = historico.data
 
-# --- 4. MENU LATERAL (LOGIN, CADASTRO E RECUPERAÇÃO) ---
+# --- 4. MENU LATERAL (LOGIN, HISTÓRICO E COMPARTILHAMENTO) ---
 with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
@@ -66,9 +96,7 @@ with st.sidebar:
             senha_login = st.text_input("Senha", type="password", key="login_pass")
             if st.button("Entrar", use_container_width=True):
                 try:
-                    # CRIPTOGRAFA a senha digitada para comparar com a que está salva no banco
                     senha_criptografada = criptografar_senha(senha_login)
-                    
                     resposta = supabase.table("usuarios").select("*").eq("usuario", usuario_login).eq("senha", senha_criptografada).execute()
                     if len(resposta.data) > 0:
                         st.session_state.logado = True
@@ -104,14 +132,12 @@ with st.sidebar:
                     st.warning("Preencha todos os campos!")
                 else:
                     try:
-                        # CRIPTOGRAFA A SENHA ANTES DE SALVAR NO BANCO!
                         senha_segura = criptografar_senha(senha_cadastro)
-                        
                         supabase.table("usuarios").insert({
                             "usuario": usuario_cadastro, 
                             "nome_completo": nome_cadastro, 
                             "nascimento": str(nascimento_cadastro), 
-                            "senha": senha_segura, # Salva a maçaroca no lugar da senha real
+                            "senha": senha_segura,
                             "pergunta_seguranca": pergunta_cadastro,
                             "resposta_seguranca": resposta_cadastro.lower()
                         }).execute()
@@ -141,9 +167,7 @@ with st.sidebar:
                         
                         if st.button("Redefinir Senha", use_container_width=True):
                             if rec_resposta.lower().strip() == resposta_correta:
-                                # CRIPTOGRAFA A NOVA SENHA ANTES DE ATUALIZAR
                                 nova_senha_segura = criptografar_senha(nova_senha)
-                                
                                 supabase.table("usuarios").update({"senha": nova_senha_segura}).eq("usuario", rec_usuario).execute()
                                 st.success("🎉 Senha alterada com sucesso! Mude para a aba 'Entrar'.")
                             else:
@@ -154,7 +178,6 @@ with st.sidebar:
                     pass
     else:
         st.success(f"Logado como: {st.session_state.nome_completo}")
-        
         st.markdown("---")
         if st.button("➕ Nova conversa", use_container_width=True):
             st.session_state.conversa_atual = None
@@ -181,17 +204,27 @@ with st.sidebar:
             st.session_state.conversa_atual = None
             st.rerun()
 
+    # --- NOVO: COMPARTILHAR O VERITAS ---
+    st.markdown("---")
+    st.markdown("### 📣 Compartilhe a Verdade")
+    st.markdown("Mande o Veritas AI para seus amigos e grupos da paróquia!")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        # Link direto para o site
+        st.link_button("🌐 Link do Site", "https://veritas-ai-arruda.streamlit.app/", use_container_width=True)
+    with col2:
+        # Link para o seu APK no Google Drive
+        # 👇 SUBSTITUA O LINK ABAIXO PELO LINK DO SEU ARQUIVO NO DRIVE!
+        st.link_button("📱 Baixar App", "https://drive.google.com/uc?id=SEU_ID_DO_ARQUIVO_AQUI&export=download", use_container_width=True)
+
     # --- CAIXA SOBRE O VERITAS AI ---
     st.markdown("---")
     with st.expander("ℹ️ Sobre o Projeto Veritas"):
         st.markdown("""
             **O Veritas AI** nasceu do desejo de auxiliar nos estudos e nas dúvidas do dia a dia sobre a fé católica. 
-            
             Atuando como um mediador inteligente, a I.A. pesquisa e baseia suas respostas exclusivamente em documentos oficiais: o **Catecismo**, o **Direito Canônico** e as **Sagradas Escrituras**.
-            
             🙏 Este é um projeto de cunho educativo e espiritual, **totalmente sem fins lucrativos**, criado para propagar a verdade de forma acessível.
-            
-            *Atenção: O Veritas AI é uma ferramenta de apoio. Ele não substitui de forma alguma a orientação de um sacerdote, a confissão ou a direção espiritual.*
         """)
 
 # --- 5. FUNÇÃO PARA LER OS PDFs (RAG) ---
@@ -239,7 +272,6 @@ for msg in st.session_state.mensagens:
 
 # --- 7. LÓGICA DE MENSAGENS E SALVAMENTO ---
 if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
-    
     st.session_state.mensagens.append({"role": "user", "content": pergunta})
     with st.chat_message("user"):
         st.markdown(pergunta)
@@ -268,7 +300,6 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
         busca = base_conhecimento.similarity_search(pergunta, k=3)
         contexto_pdf = "\n".join([doc.page_content for doc in busca])
 
-    # AQUI ESTÁ A INSTRUÇÃO MELHORADA PARA AS CITAÇÕES:
     instrucao_sistema = f"""Você é o Veritas AI, um assistente teológico católico. Responda em no máximo 2 parágrafos. 
     REGRA OBRIGATÓRIA: Sempre que mencionar uma passagem bíblica, um trecho do Catecismo da Igreja Católica (CIC) ou do Direito Canônico, você DEVE escrever a referência exata no texto (Exemplo: João 8:32, CIC § 1850). 
     Seja direto, fiel aos dogmas e use este contexto extraído de documentos oficiais para basear sua resposta: {contexto_pdf}"""
