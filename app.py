@@ -112,7 +112,8 @@ with st.sidebar:
             st.info("Digite seu usuário para buscar sua pergunta secreta.")
             rec_usuario = st.text_input("Qual seu nome de usuário (Login)?")
             
-            # --- CORREÇÃO DE UX PARA CELULAR AQUI ---
+            # --- NOVA UX PARA CELULAR: BOTÃO DE BUSCA ---
+            # Este botão serve apenas para forçar o recarregamento e ler o 'rec_usuario'
             st.button("🔍 Buscar Pergunta", use_container_width=True)
             
             if rec_usuario:
@@ -190,6 +191,7 @@ base_conhecimento = inicializar_conhecimento()
 
 # --- 6. INTERFACE DO CHAT ---
 if len(st.session_state.mensagens) == 0:
+    # A FOTO FOI REMOVIDA DAQUI
     st.markdown("""
         <div class="welcome-container">
             <h1 style='font-size: 3rem; color: #8B7500; font-family: serif;'>Veritas AI</h1>
@@ -205,6 +207,7 @@ if len(st.session_state.mensagens) == 0:
 else:
     st.markdown("<h3 style='text-align: center; color: #8B7500; font-family: serif;'>Veritas AI</h3>", unsafe_allow_html=True)
 
+# Imprime o histórico na tela
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -251,8 +254,10 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
             )
             resposta = chat_completion.choices[0].message.content
             st.markdown(resposta)
+            
             st.session_state.mensagens.append({"role": "assistant", "content": resposta})
             
+            # Salva a resposta da I.A. no banco de dados na mesma conversa
             if st.session_state.logado and st.session_state.conversa_atual:
                 try:
                     supabase.table("mensagens").insert({
