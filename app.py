@@ -13,8 +13,16 @@ st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered
 
 st.markdown("""
     <style>
+    /* Esconde o menu de hambúrguer e rodapé padrão */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    [class^="viewerBadge"] { display: none !important; }
+    [class*="viewerBadge"] { display: none !important; }
+    #viewerBadge { display: none !important; }
+    
+    /* Configurações normais do site */
     .stDeployButton {display:none;}
     .main { background-color: #fcfcfc; }
     .welcome-container { text-align: center; padding: 40px 10px; }
