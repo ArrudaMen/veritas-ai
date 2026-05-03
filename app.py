@@ -13,16 +13,10 @@ st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered
 
 st.markdown("""
     <style>
-    /* Esconde o menu de hambúrguer e rodapé padrão */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
     [class^="viewerBadge"] { display: none !important; }
-    [class*="viewerBadge"] { display: none !important; }
-    #viewerBadge { display: none !important; }
-    
-    /* Configurações normais do site */
     .stDeployButton {display:none;}
     .main { background-color: #fcfcfc; }
     .welcome-container { text-align: center; padding: 40px 10px; }
@@ -54,7 +48,7 @@ def carregar_chat(conversa_id):
     historico = supabase.table("mensagens").select("role, content").eq("conversa_id", conversa_id).order("id").execute()
     st.session_state.mensagens = historico.data
 
-# --- 4. MENU LATERAL (LOGIN, CADASTRO E RECUPERAÇÃO) ---
+# --- 4. MENU LATERAL (LOGIN, HISTÓRICO E SOBRE) ---
 with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
@@ -119,9 +113,6 @@ with st.sidebar:
         elif aba == "Recuperar Senha":
             st.info("Digite seu usuário para buscar sua pergunta secreta.")
             rec_usuario = st.text_input("Qual seu nome de usuário (Login)?")
-            
-            # --- NOVA UX PARA CELULAR: BOTÃO DE BUSCA ---
-            # Este botão serve apenas para forçar o recarregamento e ler o 'rec_usuario'
             st.button("🔍 Buscar Pergunta", use_container_width=True)
             
             if rec_usuario:
@@ -175,6 +166,19 @@ with st.sidebar:
             st.session_state.conversa_atual = None
             st.rerun()
 
+    # --- NOVO: CAIXA SOBRE O VERITAS AI ---
+    st.markdown("---")
+    with st.expander("ℹ️ Sobre o Projeto Veritas"):
+        st.markdown("""
+            **O Veritas AI** nasceu do desejo de auxiliar nos estudos e nas dúvidas do dia a dia sobre a fé católica. 
+            
+            Atuando como um mediador inteligente, a I.A. pesquisa e baseia suas respostas exclusivamente em documentos oficiais: o **Catecismo**, o **Direito Canônico** e as **Sagradas Escrituras**.
+            
+            🙏 Este é um projeto de cunho educativo e espiritual, **totalmente sem fins lucrativos**, criado para propagar a verdade de forma acessível.
+            
+            *Atenção: O Veritas AI é uma ferramenta de apoio. Ele não substitui de forma alguma a orientação de um sacerdote, a confissão ou a direção espiritual.*
+        """)
+
 # --- 5. FUNÇÃO PARA LER OS PDFs (RAG) ---
 @st.cache_resource 
 def inicializar_conhecimento():
@@ -199,7 +203,6 @@ base_conhecimento = inicializar_conhecimento()
 
 # --- 6. INTERFACE DO CHAT ---
 if len(st.session_state.mensagens) == 0:
-    # A FOTO FOI REMOVIDA DAQUI
     st.markdown("""
         <div class="welcome-container">
             <h1 style='font-size: 3rem; color: #8B7500; font-family: serif;'>Veritas AI</h1>
@@ -215,7 +218,6 @@ if len(st.session_state.mensagens) == 0:
 else:
     st.markdown("<h3 style='text-align: center; color: #8B7500; font-family: serif;'>Veritas AI</h3>", unsafe_allow_html=True)
 
-# Imprime o histórico na tela
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -262,10 +264,8 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
             )
             resposta = chat_completion.choices[0].message.content
             st.markdown(resposta)
-            
             st.session_state.mensagens.append({"role": "assistant", "content": resposta})
             
-            # Salva a resposta da I.A. no banco de dados na mesma conversa
             if st.session_state.logado and st.session_state.conversa_atual:
                 try:
                     supabase.table("mensagens").insert({
