@@ -51,7 +51,6 @@ with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
     if not st.session_state.logado:
-        # NOVO: Adicionado "Recuperar Senha"
         aba = st.radio("Escolha:", ["Entrar", "Criar Conta", "Recuperar Senha"], label_visibility="collapsed")
         
         if aba == "Entrar":
@@ -77,7 +76,6 @@ with st.sidebar:
             usuario_cadastro = st.text_input("Nome de Usuário (Login)")
             nascimento_cadastro = st.date_input("Data de Nasc.", format="DD/MM/YYYY", min_value=datetime.date(1900, 1, 1), max_value=datetime.date.today(), value=None)
             
-            # NOVO: Campos de Segurança
             st.markdown("🔒 **Segurança para recuperar senha:**")
             perguntas_lista = [
                 "Qual o nome do seu primeiro animal de estimação?",
@@ -101,7 +99,7 @@ with st.sidebar:
                             "nascimento": str(nascimento_cadastro), 
                             "senha": senha_cadastro,
                             "pergunta_seguranca": pergunta_cadastro,
-                            "resposta_seguranca": resposta_cadastro.lower() # Salva tudo minúsculo pra facilitar depois
+                            "resposta_seguranca": resposta_cadastro.lower()
                         }).execute()
                         st.success("✅ Conta criada! Mude para a aba 'Entrar'.")
                     except Exception as e:
@@ -111,9 +109,11 @@ with st.sidebar:
                             st.error("❌ Erro no banco de dados.")
 
         elif aba == "Recuperar Senha":
-            # NOVO: Lógica de Recuperação
             st.info("Digite seu usuário para buscar sua pergunta secreta.")
             rec_usuario = st.text_input("Qual seu nome de usuário (Login)?")
+            
+            # --- CORREÇÃO DE UX PARA CELULAR AQUI ---
+            st.button("🔍 Buscar Pergunta", use_container_width=True)
             
             if rec_usuario:
                 try:
@@ -128,14 +128,13 @@ with st.sidebar:
                         nova_senha = st.text_input("Crie uma nova Senha:", type="password")
                         
                         if st.button("Redefinir Senha", use_container_width=True):
-                            # Verifica se a resposta bate (tudo em minúsculo pra evitar erro de Maiúscula)
                             if rec_resposta.lower().strip() == resposta_correta:
                                 supabase.table("usuarios").update({"senha": nova_senha}).eq("usuario", rec_usuario).execute()
                                 st.success("🎉 Senha alterada com sucesso! Mude para a aba 'Entrar'.")
                             else:
                                 st.error("❌ Resposta de segurança incorreta!")
                     else:
-                        st.warning("Usuário não encontrado ou não cadastrou pergunta.")
+                        st.warning("Usuário não encontrado ou não possui pergunta cadastrada.")
                 except Exception as e:
                     pass
     else:
