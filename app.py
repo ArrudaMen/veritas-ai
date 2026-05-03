@@ -253,7 +253,9 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
         busca = base_conhecimento.similarity_search(pergunta, k=3)
         contexto_pdf = "\n".join([doc.page_content for doc in busca])
 
-    instrucao_sistema = f"""Você é o Veritas AI, um assistente teológico católico. Responda em no máximo 2 parágrafos. Use este contexto extraído de documentos: {contexto_pdf}"""
+    instrucao_sistema = f"""Você é o Veritas AI, um assistente teológico católico. Responda em no máximo 2 parágrafos. 
+    REGRA OBRIGATÓRIA: Sempre que mencionar uma passagem bíblica, um trecho do Catecismo da Igreja Católica (CIC) ou do Direito Canônico, você DEVE escrever a referência exata no texto (Exemplo: João 8:32, CIC § 1850). 
+    Seja direto, fiel aos dogmas e use este contexto extraído de documentos para basear sua resposta: {contexto_pdf}"""
 
     try:
         with st.chat_message("assistant"):
