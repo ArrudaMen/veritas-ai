@@ -19,43 +19,37 @@ st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered
 
 st.markdown("""
     <style>
+    /* 1. Esconde o menu de opções (três pontinhos) e o botão de Deploy */
     #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
     .stDeployButton {display:none;}
+    
+    /* ATENÇÃO: Retiramos o 'header {visibility: hidden;}' para a seta voltar a aparecer! */
+    
+    /* 2. Esconde o rodapé padrão */
+    footer {visibility: hidden;}
+
+    /* 3. CÓDIGO NUCLEAR: Tenta de todas as formas esconder a foto/badge do Streamlit */
+    [data-testid="stViewerBadge"], 
+    .viewerBadge_container, 
+    .viewerBadge_link, 
+    [class^="viewerBadge"], 
+    [class*="viewerBadge"],
+    #viewerBadge,
+    iframe[title*="badge"] {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    /* 4. Estiliza a setinha do menu lateral (que agora vai aparecer) */
+    [data-testid="collapsedControl"] {
+        color: #8B7500 !important; /* Deixa a setinha dourada */
+    }
+
+    /* 5. Cores do fundo do site */
     .main { background-color: #fcfcfc; }
     .welcome-container { text-align: center; padding: 40px 10px; }
-
-    /* ========================================================= */
-    /* 🥷 NOVO CÓDIGO NINJA DE CSS (CIRÚRGICO)                     */
-    /* ========================================================= */
-    
-    /* 1. Esconde o selo/badge do Streamlit (onde ficava a foto) */
-    [data-testid="stViewerBadge"] {
-        display: none !important;
-    }
-    
-    /* 2. Força o controle do menu lateral a APARECER no mobile */
-    [data-testid="collapsedControl"] {
-        display: flex !important;
-        visibility: visible !important;
-        background-color: white !important; /* Fundo branco pra destacar */
-        border-radius: 50% !important;     /* Redondinho */
-        border: 2px solid #8B7500 !important; /* Borda dourada */
-        width: 50px !important;            /* Maior pra dar o tap */
-        height: 50px !important;           /* Maior */
-        left: 10px !important;             /* Um pouco pro lado */
-        top: 10px !important;              /* Um pouco pra baixo */
-        z-index: 999999 !important;        /* Sempre no topo */
-    }
-
-    /* 3. Aumenta o tamanho da setinha '>' dentro do botão */
-    [data-testid="collapsedControl"] svg {
-        width: 30px !important;
-        height: 30px !important;
-        color: #8B7500 !important; /* Setinha dourada */
-    }
-    /* ========================================================= */
     </style>
     """, unsafe_allow_html=True)
 
