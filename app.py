@@ -1,12 +1,18 @@
 import streamlit as st
 import os
 import datetime
+import hashlib # NOVO: Biblioteca de Criptografia do Python
 from groq import Groq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from supabase import create_client, Client
+
+# --- FUNÇÃO DE CRIPTOGRAFIA (HASH) ---
+def criptografar_senha(senha):
+    # Transforma a senha em uma "maçaroca" indecifrável de 64 caracteres
+    return hashlib.sha256(senha.encode()).hexdigest()
 
 # --- 1. CONFIGURAÇÃO VISUAL E LIMPEZA ---
 st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered")
@@ -48,7 +54,7 @@ def carregar_chat(conversa_id):
     historico = supabase.table("mensagens").select("role, content").eq("conversa_id", conversa_id).order("id").execute()
     st.session_state.mensagens = historico.data
 
-# --- 4. MENU LATERAL (LOGIN, HISTÓRICO E SOBRE) ---
+# --- 4. MENU LATERAL (LOGIN, CADASTRO E RECUPERAÇÃO) ---
 with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
@@ -60,7 +66,10 @@ with st.sidebar:
             senha_login = st.text_input("Senha", type="password", key="login_pass")
             if st.button("Entrar", use_container_width=True):
                 try:
-                    resposta = supabase.table("usuarios").select("*").eq("usuario", usuario_login).eq("senha", senha_login).execute()
+                    # CRIPTOGRAFA a senha digitada para comparar com a que está salva no banco
+                    senha_criptografada = criptografar_senha(senha_login)
+                    
+                    resposta = supabase.table("usuarios").select("*").eq("usuario", usuario_login).eq("senha", senha_criptografada).execute()
                     if len(resposta.data) > 0:
                         st.session_state.logado = True
                         st.session_state.usuario = usuario_login
@@ -95,11 +104,14 @@ with st.sidebar:
                     st.warning("Preencha todos os campos!")
                 else:
                     try:
+                        # CRIPTOGRAFA A SENHA ANTES DE SALVAR NO BANCO!
+                        senha_segura = criptografar_senha(senha_cadastro)
+                        
                         supabase.table("usuarios").insert({
                             "usuario": usuario_cadastro, 
                             "nome_completo": nome_cadastro, 
                             "nascimento": str(nascimento_cadastro), 
-                            "senha": senha_cadastro,
+                            "senha": senha_segura, # Salva a maçaroca no lugar da senha real
                             "pergunta_seguranca": pergunta_cadastro,
                             "resposta_seguranca": resposta_cadastro.lower()
                         }).execute()
@@ -129,7 +141,10 @@ with st.sidebar:
                         
                         if st.button("Redefinir Senha", use_container_width=True):
                             if rec_resposta.lower().strip() == resposta_correta:
-                                supabase.table("usuarios").update({"senha": nova_senha}).eq("usuario", rec_usuario).execute()
+                                # CRIPTOGRAFA A NOVA SENHA ANTES DE ATUALIZAR
+                                nova_senha_segura = criptografar_senha(nova_senha)
+                                
+                                supabase.table("usuarios").update({"senha": nova_senha_segura}).eq("usuario", rec_usuario).execute()
                                 st.success("🎉 Senha alterada com sucesso! Mude para a aba 'Entrar'.")
                             else:
                                 st.error("❌ Resposta de segurança incorreta!")
@@ -166,7 +181,7 @@ with st.sidebar:
             st.session_state.conversa_atual = None
             st.rerun()
 
-    # --- NOVO: CAIXA SOBRE O VERITAS AI ---
+    # --- CAIXA SOBRE O VERITAS AI ---
     st.markdown("---")
     with st.expander("ℹ️ Sobre o Projeto Veritas"):
         st.markdown("""
@@ -253,9 +268,10 @@ if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
         busca = base_conhecimento.similarity_search(pergunta, k=3)
         contexto_pdf = "\n".join([doc.page_content for doc in busca])
 
+    # AQUI ESTÁ A INSTRUÇÃO MELHORADA PARA AS CITAÇÕES:
     instrucao_sistema = f"""Você é o Veritas AI, um assistente teológico católico. Responda em no máximo 2 parágrafos. 
     REGRA OBRIGATÓRIA: Sempre que mencionar uma passagem bíblica, um trecho do Catecismo da Igreja Católica (CIC) ou do Direito Canônico, você DEVE escrever a referência exata no texto (Exemplo: João 8:32, CIC § 1850). 
-    Seja direto, fiel aos dogmas e use este contexto extraído de documentos para basear sua resposta: {contexto_pdf}"""
+    Seja direto, fiel aos dogmas e use este contexto extraído de documentos oficiais para basear sua resposta: {contexto_pdf}"""
 
     try:
         with st.chat_message("assistant"):
