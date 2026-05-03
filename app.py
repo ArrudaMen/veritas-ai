@@ -9,12 +9,12 @@ from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from supabase import create_client, Client
 
-# --- FUNÇÃO DE CRIPTOGRAFIA (HASH) ---
+#FUNÇÃO DE CRIPTOGRAFIA (HASH)
 def criptografar_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
-# --- 1. CONFIGURAÇÃO VISUAL E LIMPEZA ---
-# Mudamos para 'expanded' para tentar forçar o menu aberto no celular
+#1.CONFIGURAÇÃO VISUAL E LIMPEZA
+#Mexpanded para tentar forçar o menu aberto no celular
 st.set_page_config(page_title="Veritas AI", page_icon="✝️", layout="centered", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -53,7 +53,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. CONFIGURAÇÃO DE SEGREDOS ---
+#2. CONFIGURAÇÃO DE SEGREDOS
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -65,7 +65,7 @@ except Exception as e:
 client_groq = Groq(api_key=GROQ_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- 3. CONTROLE DE SESSÃO LOCAL ---
+#3. CONTROLE DE SESSÃO LOCAL
 if "logado" not in st.session_state:
     st.session_state.logado = False
     st.session_state.usuario = ""
@@ -78,7 +78,7 @@ def carregar_chat(conversa_id):
     historico = supabase.table("mensagens").select("role, content").eq("conversa_id", conversa_id).order("id").execute()
     st.session_state.mensagens = historico.data
 
-# --- 4. MENU LATERAL (LOGIN, HISTÓRICO E COMPARTILHAMENTO) ---
+#4. MENU LATERAL (LOGIN, HISTÓRICO E COMPARTILHAMENTO)
 with st.sidebar:
     st.markdown("### 👤 Área do Usuário")
     
@@ -198,20 +198,20 @@ with st.sidebar:
             st.session_state.conversa_atual = None
             st.rerun()
 
-    # --- NOVO: COMPARTILHAR O VERITAS ---
+    #NOVO: COMPARTILHAR O VERITAS
     st.markdown("---")
     st.markdown("### 📣 Compartilhe a Verdade")
     st.markdown("Mande o Veritas AI para seus amigos e grupos da paróquia!")
     
     col1, col2 = st.columns(2)
     with col1:
-        # Link direto para o site
+        #Link direto para o site
         st.link_button("🌐 Link do Site", "https://veritas-ai-arruda.streamlit.app/", use_container_width=True)
     with col2:
-        # Link para o seu APK no Google Drive
-        # 👇 SUBSTITUA O LINK ABAIXO PELO LINK DO SEU ARQUIVO NO DRIVE!
+        #Link para o seu APK no Google Drive
+        #SUBSTITUA O LINK ABAIXO PELO LINK DO SEU ARQUIVO NO DRIVE!
         st.link_button("📱 Baixar App", "https://drive.google.com/uc?id=1FoX7osjHLmij0X42bwUdhflJ3_GIsZ_8&export=download", use_container_width=True)
-    # --- CAIXA SOBRE O VERITAS AI ---
+    #CAIXA SOBRE O VERITAS AI
     st.markdown("---")
     with st.expander("ℹ️ Sobre o Projeto Veritas"):
         st.markdown("""
@@ -220,7 +220,7 @@ with st.sidebar:
             🙏 Este é um projeto de cunho educativo e espiritual, **totalmente sem fins lucrativos**, criado para propagar a verdade de forma acessível.
         """)
 
-# --- 5. FUNÇÃO PARA LER OS PDFs (RAG) ---
+#5. FUNÇÃO PARA LER OS PDFs (RAG)
 @st.cache_resource 
 def inicializar_conhecimento():
     diretorio_banco = "docs/chroma"
@@ -242,7 +242,7 @@ def inicializar_conhecimento():
 
 base_conhecimento = inicializar_conhecimento()
 
-# --- 6. INTERFACE DO CHAT ---
+#6. INTERFACE DO CHAT
 if len(st.session_state.mensagens) == 0:
     st.markdown("""
         <div class="welcome-container">
@@ -263,7 +263,7 @@ for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# --- 7. LÓGICA DE MENSAGENS E SALVAMENTO ---
+#7. LÓGICA DE MENSAGENS E SALVAMENTO ---
 if pergunta := st.chat_input("Em que posso ajudar na sua fé hoje?"):
     st.session_state.mensagens.append({"role": "user", "content": pergunta})
     with st.chat_message("user"):
