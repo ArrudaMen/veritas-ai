@@ -210,8 +210,7 @@ with st.sidebar:
     with col2:
         # Link para o seu APK no Google Drive
         # 👇 SUBSTITUA O LINK ABAIXO PELO LINK DO SEU ARQUIVO NO DRIVE!
-        st.link_button("📱 Baixar App", "https://drive.google.com/uc?id=SEU_ID_DO_ARQUIVO_AQUI&export=download", use_container_width=True)
-
+        st.link_button("📱 Baixar App", "https://drive.google.com/uc?id=1FoX7osjHLmij0X42bwUdhflJ3_GIsZ_8&export=download", use_container_width=True)
     # --- CAIXA SOBRE O VERITAS AI ---
     st.markdown("---")
     with st.expander("ℹ️ Sobre o Projeto Veritas"):
