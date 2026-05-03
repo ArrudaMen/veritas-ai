@@ -1,0 +1,47 @@
+✝️ Veritas AI - Assistente Teológico Católico
+
+O *Veritas AI* é uma aplicação web e mobile (Android) baseada em Inteligência Artificial, criada para atuar como um mediador inteligente no estudo e esclarecimento de dúvidas sobre a fé católica. 
+
+Este projeto não possui fins lucrativos e utiliza a técnica de *RAG (Retrieval-Augmented Generation)* para garantir que a I.A. baseie suas respostas exclusivamente em documentos oficiais e irrefutáveis da Igreja.
+
+Acesso Web: [Veritas AI](https://veritas-ai-arruda.streamlit.app/)
+
+---
+
+Tecnologias Utilizadas (Stack)
+
+O projeto foi construído utilizando uma arquitetura moderna baseada em Python, unindo desenvolvimento web rápido, banco de dados relacional e IA Generativa de ponta.
+
+*   *Linguagem Core:* `Python 3`
+*   *Front-end & Web Framework:* `Streamlit` (com injeção customizada de CSS e UI/UX responsivo).
+*   *Inteligência Artificial (LLM):* `Llama-3 (70b-versatile)` fornecido através da API ultrarrápida do `Groq`.
+*   *Orquestração de I.A. (RAG):* `LangChain`
+*   *Processamento de Linguagem Natural (NLP):* `HuggingFace Embeddings` (modelo `all-MiniLM-L6-v2`) para vetorização semântica.
+*   *Banco de Dados Vetorial:* `ChromaDB` (para armazenamento em cache local do conhecimento).
+*   *Banco de Dados em Nuvem & Auth:* `Supabase` (PostgreSQL).
+*   *Mobile (Android):* Distribuição em formato `.apk` usando arquitetura WebView.
+
+---
+
+Arquitetura e Funcionalidades
+
+1. Sistema RAG (Retrieval-Augmented Generation)
+A Inteligência Artificial não sofre de "alucinação", pois está restrita a um escopo fechado de conhecimento. O sistema lê, recorta (Text Splitter) e converte em vetores (Embeddings) os seguintes documentos em PDF:
+*   Catecismo da Igreja Católica (CIC)
+*   Código de Direito Canônico
+*   Sagradas Escrituras
+A I.A. possui uma instrução de sistema rigorosa (`System Prompt`) que a obriga a fornecer referências exatas em suas respostas.
+
+2. Segurança e Controle de Acesso
+*   Sistema de Login e Cadastro conectado ao banco de dados Supabase.
+*   *Criptografia de Senhas:* Nenhuma senha é salva em texto limpo. Foi implementada a biblioteca nativa `hashlib` para gerar Hashes irreversíveis em `SHA-256`.
+*   Recuperação de Senha através de Perguntas de Segurança.
+
+3. Histórico de Conversas (Session State)
+*   Implementação de persistência de dados. O sistema salva cada interação do usuário com a IA no banco de dados.
+*   Quando o usuário faz o login, o sistema recupera seus chats recentes, permitindo continuar conversas teológicas de onde parou.
+
+
+
+Desenvolvedor
+Projeto idealizado e desenvolvido por Thiago Arruda (ArrudaTech).
